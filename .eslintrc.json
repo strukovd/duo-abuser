@@ -1,0 +1,43 @@
+{
+	"env": {
+		"browser": true,
+		"webextensions": true,
+		"es6": true
+	},
+	"extends": "eslint:recommended",
+	"globals": {
+		"Atomics": "readonly",
+		"SharedArrayBuffer": "readonly"
+	},
+	"parserOptions": {
+		"ecmaVersion": 2018
+	},
+	"rules": {
+		"indent": [
+			"error",
+			"tab",
+			{"SwitchCase": 1}
+		],
+		"linebreak-style": [
+			"error",
+			"unix"
+		],
+		"semi": [
+			"error",
+			"always"
+		],
+		"brace-style": [
+			"error",
+			"stroustrup",
+			{ "allowSingleLine": true }
+		],
+
+		// "max-len": ["error", {"code": 160}],
+		"prefer-const": ["error", { "destructuring": "all", "ignoreReadBeforeAssign": false }],
+		// "function-call-argument-newline": ["error", "never"],
+		// "function-paren-newline": ["error", { "minItems": 10 }],
+		"arrow-parens": [1, "as-needed", { "requireForBlockBody": false }],
+		"no-unused-vars": ["error", { "argsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "_" }],
+		"no-use-before-define": ["error", { "functions": false }]
+	}
+}

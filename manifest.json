@@ -1,0 +1,27 @@
+{
+    "name": "Duo-Abuser",
+    "description": "Duo-Abuser",
+    "version": "1.0",
+    "manifest_version": 3,
+
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "tabs",
+        "notifications"
+    ],
+
+    "action": {
+            "default_icon": {
+                "16": "action/icons/bird2.png",
+                "24": "action/icons/bird2.png",
+                "32": "action/icons/bird2.png"
+            },
+            "default_title": "Duo-Abuser",
+            "default_popup": "action/popup/popup.html"
+      },
+
+    "background": {
+        "service_worker": "background/background.js"
+    }
+}
