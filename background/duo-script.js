@@ -7,16 +7,18 @@ else {
 
 
 function init() {
-    Abuser.launch();
+    Abuser.launchGame();
 }
 
 
 class Abuser {
-    static iterationDelay = 1000;
+    static delay = 500;
     static launched = false;
     static lessonUrl = "https://www.duolingo.com/lesson/unit/2/level/10";
     static winCounter = 0;
+    static loseCounter = 0;
     static resetTimer = 10000; // Если задача не завершилась за 10 сек, начать все сначала
+    static allowedStrings = ['ewqeq', 'ewrer', 'qwwewed', 'ewrewwe', 'wqee', 'wqweeqw', 'weweq', 'qwrew', 'wwqewqe', 'ewwqe', 'wqeqwe', 'ewweqw', 'ewqweq', 'ewqewq', 'ewqew'];
     static answersMap = {
         "кофе": "coffee",
         "пожалуйста": "please",
@@ -30,93 +32,102 @@ class Abuser {
         "Приятно познакомиться, Максим.": "Nice to meet you, Maksim.",
         "Приятно познакомиться, София.": "Nice to meet you, Sofia."
     };
-    static launchAlgorithm = [];
-    static roundAlgorithm = [];
-    static roundMiddleware = [];
-    static prevRound = {};
+    static tasks = [];
+    // static roundMiddleware = [];
+    static lastTaskInfo = {};
     static winMode = true;
+    static workerId = null;
     static worker = null;
 
-    static launch() {
-        console.log(`Вызван метод launch`);
+
+    static run() {
+        this.workerId = setInterval(
+            this.handleTask.bind(this),
+            this.delay
+        )
+    }
+
+    static handleTask() {
+        if( this.tasks.length === 0 ) {
+            return;
+        }
+        else {
+            const currentTask = this.tasks[0];
+
+            // Если тек. задача новая, записываем ее в реестр
+            if( this.lastTaskInfo.task !== currentTask ) {
+                this.lastTaskInfo.task = currentTask;
+                this.lastTaskInfo.timeStart = new Date().getTime();
+            }
+            else { // Иначе. Выполняется предыдущая задача
+                const diffTimeSec = ( (new Date().getTime()) - this.lastTaskInfo.timeStart ) / 1000;
+                if(diffTimeSec > this.resetTimer) { // Если выполняется больше resetTimer сек.
+                    this.abort();
+                }
+            }
+
+            const taskIsCompleted = currentTask();
+            if(taskIsCompleted) {
+                this.tasks.shift();
+            }
+        }
+    }
+
+
+    static async abort() {
+        clearInterval(this.workerId);
+        await chrome.runtime.sendMessage({}); // Запускаем заново
+    }
+
+
+    static launchGame() {
+        console.log(`Вызван метод launchGame`);
         this.winCounter = 0;
 
-        this.launchAlgorithm.push(()=>this.waitForReadyPage());
-        this.launchAlgorithm.push(()=>this.clickNextButton("Далее"));
-        this.launchAlgorithm.push(()=>this.registerRoundTasks());
+        this.tasks.push(()=>this.TASK_waitForLoadPage()); // Ждет когда страница загрузиться
+        this.tasks.push(()=>this.TASK_clickNextButton("Далее")); // Нажимает кнопку далее
+        this.tasks.push(()=>this.TASK_registerGameTasks()); // Регистрирует действия игры
 
-        this.makeLaunchTask();
-    }
-
-    static makeLaunchTask() {
-        console.log(`Вызван метод makeLaunchTask`);
-        if( this.launchAlgorithm.length == 0 ) return;
-
-        if( this.launchAlgorithm[0]() ) {
-            this.launchAlgorithm.shift();
-        }
-
-        setTimeout(this.makeLaunchTask.bind(this), this.iterationDelay);
+        this.run();
     }
 
 
-    static registerRoundTasks() {
-        console.log(`Вызван метод registerRoundTasks`);
-        this.roundMiddleware = [];
-        this.roundMiddleware.push(()=>this.waitForReadyPage()); // TODO: не используется
+    static TASK_registerGameTasks() {
+        console.log(`Вызван метод registerGameTasks`);
 
-        this.roundAlgorithm = [];
-        this.roundAlgorithm.push(()=>this.waitForTextarea());
-        this.roundAlgorithm.push(()=>this.setAnswer());
-        this.roundAlgorithm.push(()=>this.clickNextButton("Проверить"));
-        this.roundAlgorithm.push(()=>this.countTheRound());
-        this.roundAlgorithm.push(()=>this.clickNextButton("Далее"));
-        this.roundAlgorithm.push(()=>this.checkGameStatus());
+        // this.tasks = [];
+        this.tasks.push(()=>this.TASK_waitForTextarea());
+        this.tasks.push(()=>this.TASK_setAnswer());
+        this.tasks.push(()=>this.TASK_clickNextButton("Проверить"));
+        this.tasks.push(()=>this.TASK_checkAnswerStatus());
+        this.tasks.push(()=>this.TASK_clickNextButton("Далее"));
+        this.tasks.push(()=>this.TASK_checkIsGameEnded());
 
-        setTimeout(this.runRoundTask.bind(this), this.iterationDelay);
         return true;
     }
 
 
-    static runRoundTask() {
-        console.log(`Вызван метод runRoundTask`);
-        if( this.roundAlgorithm.length == 0 ) return;
-
-        const curTask = this.roundAlgorithm[0];
-        if( this.prevRound.task !== curTask ) {
-            this.prevRound.task = curTask;
-            this.prevRound.timeStart = new Date().getTime();
-        }
-        else {
-            const diffTimeSec = ( (new Date().getTime()) - this.prevRound.timeStart ) / 1000;
-            if(diffTimeSec > 15) { // Если выполняется больше 15 сек.
-
-            }
-        }
-
-        const isTaskCompleted = curTask();
-        if( isTaskCompleted ) {
-            this.roundAlgorithm.shift();
-        }
-
-        setTimeout(this.runRoundTask.bind(this), this.iterationDelay);
-    }
 
 
-    static clickNextButton(title) {
+    /**
+     * Нажимает на кнопку
+     * @param {*} title подпись на кнопке
+     */
+    static TASK_clickNextButton(title) {
         console.log(`Вызван метод clickNextButton`);
 
         const button = document.querySelector(`[data-test="player-next"]`);
         if(!button) return false;
+        const buttonClassList = Array.from(button.classList).join(' ');
 
         for (const span of button.querySelectorAll(`span`)) {
             if (span && span.textContent === title) {
                 button.dispatchEvent(new Event('click', { bubbles: true }));
 
                 // Вынимаем тек. задачу, подкладываем проверку, и возвращаем тек. задачу в очередь
-                const currentTask = this.roundAlgorithm.shift();
-                this.roundAlgorithm.unshift( ()=>this.isButtonSuccessfulPushed(title) );
-                this.roundAlgorithm.unshift(currentTask);
+                const currentTask = this.tasks.shift();
+                this.tasks.unshift( ()=>this.isButtonSuccessfulPushed(title, buttonClassList) );
+                this.tasks.unshift(currentTask);
                 return true;
             }
         }
@@ -124,16 +135,25 @@ class Abuser {
         return false;
     }
 
-    static isButtonSuccessfulPushed(title) {
+    /**
+     * Убеждается что кнопка была нажата, регистрируется внутри clickNextButton
+     * @param {*} title имя кнопки (если имя другое, значит это уже не та кнопка)
+     */
+    static isButtonSuccessfulPushed(title, prevButtonClassList) {
         console.log(`Вызван метод isButtonSuccessful`);
 
         const button = document.querySelector(`[data-test="player-next"]`);
         if(!button) return true;
         else {
-            for (const span of button.querySelectorAll(`span`)) {
-                if (span && span.textContent === title) {
-                    button.dispatchEvent(new Event('click', { bubbles: true }));
-                    return false;
+            // Если кнопка есть и у нее такие же классы
+            const curButtonClassList = Array.from(button.classList).join(' ');
+            if(curButtonClassList === prevButtonClassList) {
+                // И такая же надпись, вероятно нажатие не сработало
+                for (const span of button.querySelectorAll(`span`)) {
+                    if (span && span.textContent === title) {
+                        button.dispatchEvent(new Event('click', { bubbles: true }));
+                        return false;
+                    }
                 }
             }
 
@@ -141,7 +161,10 @@ class Abuser {
         }
     }
 
-    static waitForTextarea(title) {
+    /**
+     * Ждет пока не появиться textarea
+     */
+    static TASK_waitForTextarea() {
         console.log(`Вызван метод waitForTextarea`);
         const textarea = document.querySelector(`[data-test="challenge-translate-input"]`);
         if (textarea) {
@@ -152,7 +175,10 @@ class Abuser {
         }
     }
 
-    static setAnswer() {
+    /**
+     * Читает вопрос, ищет ответ, ставит ответ в текстовое поле
+     */
+    static TASK_setAnswer() {
         console.log(`Вызван метод setAnswer`);
         try {
             const question = Array.from( document.querySelectorAll(`[data-test=hint-token]`) ).map( (val )=> val.textContent ).join('')
@@ -166,12 +192,12 @@ class Abuser {
                 }
             }
             else {
-                answer = "cofe";
+                const randomDigit = Math.floor(Math.random() * 14);
+                answer = this.allowedStrings[randomDigit];
             }
 
             if( !question || !textarea ) throw new Error("Что-то пошло не так..");
 
-            // this.setNativeValue(textarea, answer);
             textarea.textContent = answer;
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -182,7 +208,12 @@ class Abuser {
         }
     }
 
-    static countTheRound() {
+
+
+    /**
+     * Проверяет тек. страницу success или failed и засчитывает очко
+     */
+    static TASK_checkAnswerStatus() {
         console.log(`Вызван метод countTheRound`);
         try {
             const successClass = "_3e9O1";
@@ -196,6 +227,9 @@ class Abuser {
                     this.winCounter++;
                     console.log(`Правильный ответ! Текущая сумма ответов: ${this.winCounter}`);
                 }
+                else {
+                    this.loseCounter++;
+                }
                 return true;
             }
         } catch (error) {
@@ -204,12 +238,12 @@ class Abuser {
         }
     }
 
-    static waitForReadyPage() {
-        console.log(`Вызван метод waitForReadyPage`);
-        if(window.location.href !== this.lessonUrl) {
-            window.location.href = this.lessonUrl;
-            return false;
-        }
+
+    /**
+     * Ждет загрузки страницы
+     */
+    static TASK_waitForLoadPage() {
+        console.log(`Вызван метод waitForLoadPage`);
 
         if (document.readyState !== "complete") {
             return false;
@@ -218,14 +252,36 @@ class Abuser {
         return true;
     }
 
-    static checkGameStatus() {
-        // Проверка того что текущее окно не получение 20 баллов
-        // класс фиолетовой кнопки: .tEvKV
-        if( document.querySelector(`.tEvKV`) ) {
-            this.winMode = false;
+
+    /**
+     * Меняет стутс игры если баллы получены
+     */
+    static TASK_checkIsGameEnded() {
+
+        if(!this.winMode && this.loseCounter === 3) {
+            // 3 проигрыша
+            // Нажать далее (при получении 20 баллов)
+            const currentTask = this.tasks.shift();
+            this.tasks = [];
+            this.tasks.push(currentTask);
+            this.tasks.push( ()=>this.TASK_clickNextButton("Далее") );
+            this.tasks.push( ()=>{this.abort(); return true;} );
+        }
+        else {
+            // Проверка того что текущее окно не получение 20 баллов
+            // класс фиолетовой кнопки: .tEvKV
+            if( document.querySelector(`.tEvKV`) ) {
+                this.winMode = false;
+                // Нажать далее (при получении 20 баллов)
+                const currentTask = this.tasks.shift();
+                this.tasks.unshift( ()=>this.TASK_clickNextButton("Далее") );
+                this.tasks.unshift(currentTask);
+            }
+
+            this.TASK_registerGameTasks();
         }
 
-        this.registerRoundTasks();
+        return true;
     }
 
     static setNativeValue(element, value) {
@@ -244,3 +300,5 @@ class Abuser {
         }
     }
 }
+
+
