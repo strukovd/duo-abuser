@@ -1,17 +1,5 @@
-if (document.readyState !== "complete") {
-    window.addEventListener('load', init);
-}
-else {
-    init();
-}
-
-
-function init() {
-    Abuser.launchGame();
-}
-
-
 class Abuser {
+	//TODO: сделать открытие новой вкладки в том же окне что и предыдущая
     static delay = 500;
     static launched = false;
     static lessonUrl = "https://www.duolingo.com/lesson/unit/2/level/10";
@@ -30,7 +18,8 @@ class Abuser {
         "Кофе": "Coffee?",
         "кофе и чай": "coffee and tea",
         "Приятно познакомиться, Максим.": "Nice to meet you, Maksim.",
-        "Приятно познакомиться, София.": "Nice to meet you, Sofia."
+        "Приятно познакомиться, София.": "Nice to meet you, Sofia.",
+		"Приятно познакомиться.": "Nice to meet you."
     };
     static tasks = [];
     // static roundMiddleware = [];
@@ -75,6 +64,7 @@ class Abuser {
 
 
     static async abort() {
+		console.warn(`Duo-abuser aborted!`);
         clearInterval(this.workerId);
         await chrome.runtime.sendMessage({}); // Запускаем заново
     }
@@ -301,4 +291,18 @@ class Abuser {
     }
 }
 
+
+function init() {
+    Abuser.launchGame();
+}
+
+
+if (document.readyState !== "complete") {
+	console.warn("not loaded");
+    window.addEventListener('load', init);
+}
+else {
+	console.warn("loaded");
+	init();
+}
 
